@@ -1,3 +1,1 @@
-Flask3.0.3
-yt-dlp2025.02.19
-gunicorn==22.0.0
+Flask3.0.3 yt-dlp2024.03.10  gunicorn==22.0.0
