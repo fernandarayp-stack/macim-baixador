@@ -2,10 +2,11 @@ from flask import Flask, request, jsonify, render_template_string, send_file
 import yt_dlp
 import os
 import uuid
+import time
 
 app = Flask(__name__)
 
-# --- O NOSSO SITE EM HTML (Apenas o Baixador) ---
+# --- O NOSSO SITE EM HTML ---
 HTML_SITE = """
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -66,7 +67,7 @@ HTML_SITE = """
             <!-- Loading State da Busca -->
             <div id="loadingStateBaixador" class="hidden flex flex-col items-center justify-center py-10">
                 <div class="loader mb-4"></div>
-                <p class="text-gray-500 text-sm font-medium animate-pulse">A buscar informações do vídeo...</p>
+                <p class="text-gray-500 text-sm font-medium animate-pulse">A procurar informações do vídeo...</p>
             </div>
 
             <div id="resultAreaBaixador" class="hidden mt-8 pt-6 border-t border-gray-200 fade-in">
@@ -75,11 +76,28 @@ HTML_SITE = """
                         <img id="videoThumbBaixador" src="" class="w-full sm:w-40 h-28 object-cover rounded-xl shadow-md bg-gray-200 shrink-0">
                         <div class="flex-1 min-w-0 w-full">
                             <h2 id="videoTitleBaixador" class="text-base font-bold text-gray-900 line-clamp-2 mb-2" title="Título do Vídeo">Título</h2>
+                            
+                            <!-- Descrição -->
+                            <div class="bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs text-gray-600 max-h-24 overflow-y-auto custom-scrollbar">
+                                <span class="font-bold text-gray-800 block mb-1">Descrição:</span>
+                                <p id="videoDescBaixador" class="whitespace-pre-wrap leading-relaxed">Carregando...</p>
+                            </div>
                         </div>
+                    </div>
+                    
+                    <div class="border-t border-gray-100 pt-4 mt-2" id="secaoQualidade">
+                        <label class="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                            <i data-lucide="settings" class="w-4 h-4 text-gray-500"></i> Escolha o Formato:
+                        </label>
+                        <select id="qualidadeBaixador" class="block w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 bg-gray-50 font-medium text-gray-900 cursor-pointer">
+                            <option value="alta">🎥 Vídeo: Alta Qualidade (Máxima disponível)</option>
+                            <option value="media">🎥 Vídeo: Qualidade Média (Mais leve)</option>
+                            <option value="audio">🎵 Apenas Áudio (Formato MP3)</option>
+                        </select>
                     </div>
                 </div>
                 
-                <button onclick="iniciarDownloadCompleto()" id="btnFazerDownload" class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-4 rounded-xl shadow-xl transition-all active:scale-95 text-lg">
+                <button onclick="iniciarDownloadSelecionado()" id="btnFazerDownload" class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-4 rounded-xl shadow-xl transition-all active:scale-95 text-lg">
                     <i data-lucide="download-cloud" class="w-6 h-6"></i> Iniciar Download
                 </button>
             </div>
@@ -90,18 +108,22 @@ HTML_SITE = """
         lucide.createIcons();
         
         let urlParaBaixar = '';
+        let tituloParaBaixar = '';
+        let isYoutube = false;
 
         function linkValido(url) {
             return url.trim().startsWith('http://') || url.trim().startsWith('https://');
         }
-        
-        // Função para extrair ID do YouTube caso seja um link do Youtube
+
         function extrairVideoId(url) {
             const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
             const match = url.match(regex);
             return match ? match[1] : null;
         }
 
+        // ==========================================
+        // LÓGICA DE PESQUISA INTELIGENTE
+        // ==========================================
         document.getElementById('downloadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const url = document.getElementById('urlInputBaixador').value.trim();
@@ -111,59 +133,229 @@ HTML_SITE = """
             }
 
             urlParaBaixar = url;
+            const videoId = extrairVideoId(url);
+            isYoutube = videoId !== null;
+
             document.getElementById('resultAreaBaixador').classList.add('hidden');
             document.getElementById('loadingStateBaixador').classList.remove('hidden');
 
-            try {
-                // Fetch info via noembed (which usually still works for basic info)
-                let videoId = extrairVideoId(url);
-                if (videoId) {
+            if (isYoutube) {
+                // SE FOR YOUTUBE: Usa Noembed para evitar bloqueio do servidor
+                document.getElementById('secaoQualidade').classList.add('hidden'); // Esconde opção de qualidade pois o externo lida com isso
+                try {
                     const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
                     const data = await response.json();
-                    document.getElementById('videoTitleBaixador').textContent = data.title;
+                    document.getElementById('videoTitleBaixador').textContent = data.title || "Vídeo do YouTube";
                     document.getElementById('videoThumbBaixador').src = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-                } else {
-                     // Para outros sites, apenas exibe um título genérico por enquanto
-                     document.getElementById('videoTitleBaixador').textContent = "Vídeo Pronto para Download";
-                     document.getElementById('videoThumbBaixador').src = "https://via.placeholder.com/300x200.png?text=Vídeo";
+                    document.getElementById('videoDescBaixador').textContent = "Pronto para baixar através do serviço externo seguro.";
+                    
+                    document.getElementById('loadingStateBaixador').classList.add('hidden');
+                    document.getElementById('resultAreaBaixador').classList.remove('hidden');
+                } catch (error) {
+                    alert("Erro ao ler o vídeo. O link do YouTube está correto?");
+                    document.getElementById('loadingStateBaixador').classList.add('hidden');
                 }
-                
-                document.getElementById('loadingStateBaixador').classList.add('hidden');
-                document.getElementById('resultAreaBaixador').classList.remove('hidden');
-            } catch (e) {
-                document.getElementById('loadingStateBaixador').classList.add('hidden');
-                alert("Erro ao obter as informações do vídeo. Verifique se o link está correto.");
+            } else {
+                // SE FOR TIKTOK, INSTA, FACEBOOK: Usa o nosso servidor Python
+                document.getElementById('secaoQualidade').classList.remove('hidden');
+                try {
+                    const response = await fetch('/api/info', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: url })
+                    });
+                    const res = await response.json();
+                    
+                    if (res.sucesso) {
+                        tituloParaBaixar = res.dados.titulo;
+                        document.getElementById('videoTitleBaixador').textContent = res.dados.titulo;
+                        document.getElementById('videoThumbBaixador').src = res.dados.thumb || "https://via.placeholder.com/300x200.png?text=Sem+Capa";
+                        document.getElementById('videoDescBaixador').textContent = res.dados.descricao || "Nenhuma descrição disponível para este vídeo.";
+                        
+                        document.getElementById('loadingStateBaixador').classList.add('hidden');
+                        document.getElementById('resultAreaBaixador').classList.remove('hidden');
+                    } else {
+                        alert("Erro ao ler o vídeo. Verifique se o link está correto e é público.");
+                        document.getElementById('loadingStateBaixador').classList.add('hidden');
+                    }
+                } catch (e) {
+                    alert("Erro de conexão com o servidor.");
+                    document.getElementById('loadingStateBaixador').classList.add('hidden');
+                }
             }
         });
 
-        async function iniciarDownloadCompleto() {
-            // Em vez de baixar no servidor Render (que está bloqueado pelo Youtube), 
-            // redirecionamos o usuário para um site de download limpo e gratuito.
+        // ==========================================
+        // LÓGICA DE DOWNLOAD SEPARADA
+        // ==========================================
+        async function iniciarDownloadSelecionado() {
+            const btn = document.getElementById('btnFazerDownload');
             
-            // Verifica se é link do YouTube
-            let videoId = extrairVideoId(urlParaBaixar);
-            
-            if (videoId) {
-                 // Redireciona para o Cobalt (um downloader open-source e sem anúncios)
-                 const downloadUrl = `https://cobalt.tools/?v=https://www.youtube.com/watch?v=${videoId}`;
-                 window.open(downloadUrl, '_blank');
+            if (isYoutube) {
+                // Redireciona APENAS vídeos do Youtube para o site externo
+                const videoId = extrairVideoId(urlParaBaixar);
+                const downloadUrl = `https://cobalt.tools/?v=https://www.youtube.com/watch?v=${videoId}`;
+                window.open(downloadUrl, '_blank');
+                
+                // Limpa o ecrã
+                document.getElementById('urlInputBaixador').value = '';
+                document.getElementById('resultAreaBaixador').classList.add('hidden');
             } else {
-                 // Se for tiktok, instagram, etc. o Cobalt também aceita
-                 const downloadUrl = `https://cobalt.tools/?v=${encodeURIComponent(urlParaBaixar)}`;
-                 window.open(downloadUrl, '_blank');
+                // Para TikTok, Insta, etc... Faz o download NO NOSSO SERVIDOR
+                const qualidade = document.getElementById('qualidadeBaixador').value;
+                
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loader !border-t-white !w-6 !h-6 mr-2"></div> A processar no servidor...';
+                btn.classList.replace('bg-red-600', 'bg-gray-800');
+                btn.classList.replace('hover:bg-red-700', 'hover:bg-gray-900');
+
+                try {
+                    const response = await fetch('/api/download_video', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: urlParaBaixar, qualidade: qualidade })
+                    });
+                    const result = await response.json();
+                    
+                    if (result.sucesso) {
+                        btn.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i> Pronto! A enviar ficheiro...';
+                        btn.classList.replace('bg-gray-800', 'bg-green-600');
+                        btn.classList.replace('hover:bg-gray-900', 'hover:bg-green-700');
+                        
+                        // Envia para o PC do utilizador
+                        window.location.href = `/api/download_file?id=${result.id}&titulo=${encodeURIComponent(tituloParaBaixar)}&ext=${result.ext}`;
+                        
+                        setTimeout(() => {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i data-lucide="download-cloud" class="w-6 h-6"></i> Iniciar Download';
+                            btn.classList.replace('bg-green-600', 'bg-red-600');
+                            btn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
+                            document.getElementById('urlInputBaixador').value = '';
+                            document.getElementById('resultAreaBaixador').classList.add('hidden');
+                        }, 5000);
+                    } else {
+                        alert("Erro ao baixar: " + result.erro);
+                        restaurarBotaoErro(btn);
+                    }
+                } catch (e) { 
+                    alert("Erro de conexão durante o download."); 
+                    restaurarBotaoErro(btn);
+                }
+                lucide.createIcons();
             }
+        }
+
+        function restaurarBotaoErro(btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="refresh-cw" class="w-6 h-6"></i> Tentar Novamente';
+            btn.classList.replace('bg-gray-800', 'bg-red-600');
+            btn.classList.replace('hover:bg-gray-900', 'hover:bg-red-700');
         }
     </script>
 </body>
 </html>
 """
 
+def limpar_arquivos_antigos():
+    """Limpeza automática de ficheiros antigos para o servidor não lotar a memória"""
+    pasta_destino = 'downloads'
+    if not os.path.exists(pasta_destino):
+        return
+        
+    agora = time.time()
+    for f in os.listdir(pasta_destino):
+        caminho = os.path.join(pasta_destino, f)
+        if os.path.isfile(caminho):
+            if agora - os.path.getmtime(caminho) > 3600:
+                try:
+                    os.remove(caminho)
+                except Exception:
+                    pass
+
 @app.route('/')
 def home():
-    # Renderiza o site HTML
     return render_template_string(HTML_SITE)
 
+# Rota usada pelas redes sociais (exceto youtube)
+@app.route('/api/info', methods=['POST'])
+def info_video():
+    url = request.json.get('url')
+    opcoes_ydl = {'quiet': True, 'extract_flat': False, 'noplaylist': True}
+    try:
+        with yt_dlp.YoutubeDL(opcoes_ydl) as ydl:
+            info = ydl.extract_info(url, download=False)
+            dados = {
+                'titulo': info.get('title', 'Vídeo Sem Título'),
+                'canal': info.get('uploader', 'Autor Desconhecido'),
+                'thumb': info.get('thumbnail', ''),
+                'descricao': info.get('description', 'Nenhuma descrição disponível.') 
+            }
+        return jsonify({'sucesso': True, 'dados': dados})
+    except Exception as e:
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+# Rota de download usada pelas redes sociais (exceto youtube)
+@app.route('/api/download_video', methods=['POST'])
+def download_video():
+    limpar_arquivos_antigos()
+    
+    dados = request.json
+    url = dados.get('url')
+    qualidade = dados.get('qualidade', 'alta')
+    
+    pasta_destino = 'downloads'
+    os.makedirs(pasta_destino, exist_ok=True)
+    file_id = str(uuid.uuid4())
+    
+    if qualidade == 'audio':
+        opcoes_ydl = {
+            'format': 'bestaudio/best',
+            'outtmpl': f'{pasta_destino}/{file_id}.%(ext)s',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'quiet': True, 'noplaylist': True
+        }
+        ext_final = 'mp3'
+    elif qualidade == 'media':
+        opcoes_ydl = {
+            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
+            'merge_output_format': 'mp4',
+            'outtmpl': f'{pasta_destino}/{file_id}.%(ext)s',
+            'quiet': True, 'noplaylist': True
+        }
+        ext_final = 'mp4'
+    else: 
+        opcoes_ydl = {
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'merge_output_format': 'mp4',
+            'outtmpl': f'{pasta_destino}/{file_id}.%(ext)s',
+            'quiet': True, 'noplaylist': True
+        }
+        ext_final = 'mp4'
+
+    try:
+        with yt_dlp.YoutubeDL(opcoes_ydl) as ydl:
+            ydl.download([url])
+        return jsonify({"sucesso": True, "id": file_id, "ext": ext_final})
+    except Exception as e:
+        return jsonify({"sucesso": False, "erro": str(e)}), 500
+
+@app.route('/api/download_file')
+def enviar_para_usuario():
+    file_id = request.args.get('id')
+    titulo = request.args.get('titulo', 'video_baixado')
+    ext = request.args.get('ext', 'mp4')
+    
+    titulo_limpo = "".join([c for c in titulo if c.isalnum() or c in ' _-']).rstrip()
+    if not titulo_limpo:
+        titulo_limpo = "video_macim"
+        
+    caminho_arquivo = f'downloads/{file_id}.{ext}'
+    return send_file(caminho_arquivo, as_attachment=True, download_name=f"{titulo_limpo}.{ext}")
+
 if __name__ == '__main__':
-    # Configuração para rodar no servidor web
     porta = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=porta)
