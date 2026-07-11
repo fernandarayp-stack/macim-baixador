@@ -214,7 +214,7 @@ HTML_SITE = """
 """
 
 def limpar_arquivos_antigos():
-    """Para o servidor não ficar com disco cheio, apagamos os vídeos com mais de 1 hora"""
+    """Limpeza automática de ficheiros antigos para o servidor não lotar a memória"""
     pasta_destino = 'downloads'
     if not os.path.exists(pasta_destino):
         return
@@ -253,8 +253,7 @@ def info_video():
 
 @app.route('/api/download_video', methods=['POST'])
 def download_video():
-    # Limpa o lixo antigo antes de baixar um novo
-    limpar_arquivos_antigos()
+    limpar_arquivos_antigos() # Faz a limpeza antes de baixar um novo
     
     dados = request.json
     url = dados.get('url')
@@ -315,6 +314,6 @@ def enviar_para_usuario():
     return send_file(caminho_arquivo, as_attachment=True, download_name=f"{titulo_limpo}.{ext}")
 
 if __name__ == '__main__':
-    # Configuração para rodar no servidor web
+    # Preparado para rodar em servidores na nuvem
     porta = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=porta)
