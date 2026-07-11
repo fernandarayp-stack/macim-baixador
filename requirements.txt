@@ -1,3 +1,3 @@
 Flask3.0.3
-yt-dlp
-gunicorn22.0.0
+yt-dlp2025.02.19
+gunicorn==22.0.0
