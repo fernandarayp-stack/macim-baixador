@@ -6,110 +6,227 @@ import time
 
 app = Flask(__name__)
 
-# --- O NOSSO SITE EM HTML ---
 HTML_SITE = """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Macim Ferramentas - Baixador Universal</title>
+    <title>Macim Download - Premium</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    
     <style>
-        .fade-in { animation: fadeIn 0.4s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #ef4444; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        :root {
+            --primary: #8b5cf6; /* Violet */
+            --secondary: #3b82f6; /* Blue */
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
         
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 8px; }
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        
+        .glass-input {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .glass-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
+            outline: none;
+        }
+
+        /* Animated Blobs in Background */
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            animation: float 10s infinite ease-in-out alternate;
+        }
+        .blob-1 { top: -10%; left: -10%; width: 400px; height: 400px; background: rgba(139, 92, 246, 0.4); }
+        .blob-2 { bottom: -10%; right: -10%; width: 500px; height: 500px; background: rgba(59, 130, 246, 0.3); animation-delay: -5s; }
+        
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, 50px) scale(1.1); }
+        }
+
+        /* Loading Spinner Advanced */
+        .loader-ring {
+            width: 40px; height: 40px;
+            border: 3px solid rgba(139, 92, 246, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* General Animations */
+        .fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Gradient Text */
+        .text-gradient {
+            background: linear-gradient(to right, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 font-sans text-gray-800">
+<body class="relative flex items-center justify-center p-4">
 
-    <main class="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 flex flex-col">
+    <!-- Background Animated Blobs -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <!-- Main Container -->
+    <main class="w-full max-w-2xl glass-panel rounded-[2rem] overflow-hidden fade-in-up flex flex-col relative z-10">
         
-        <div class="bg-gradient-to-r from-red-600 to-red-500 p-8 text-center relative shrink-0">
-            <div class="absolute -right-10 -top-10 opacity-10 transform rotate-12">
-                <i data-lucide="download-cloud" class="w-48 h-48 text-white"></i>
+        <!-- Premium Header -->
+        <div class="p-8 pb-6 text-center relative border-b border-white/5">
+            <div class="inline-flex items-center justify-center p-4 bg-white/5 rounded-2xl mb-4 border border-white/10 shadow-lg backdrop-blur-md relative group">
+                <div class="absolute inset-0 bg-gradient-to-r from-violet-500 to-blue-500 opacity-20 group-hover:opacity-40 transition-opacity rounded-2xl blur-md"></div>
+                <i data-lucide="zap" class="w-10 h-10 text-violet-400 relative z-10"></i>
             </div>
-            <div class="relative z-10 flex flex-col items-center">
-                <div class="bg-white p-3 rounded-full shadow-md mb-3">
-                    <i data-lucide="video" class="w-8 h-8 text-red-600"></i>
-                </div>
-                <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Macim ferramentas</h1>
-                <p class="text-red-100 mt-2 text-sm font-medium">Baixador Universal de Alta Qualidade</p>
-            </div>
+            <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-2">
+                Macim <span class="text-gradient">Download</span>
+            </h1>
+            <p class="text-slate-400 text-sm sm:text-base font-medium">A nova geração de downloads em Alta Qualidade.</p>
         </div>
 
-        <div class="p-6 sm:p-8 bg-gray-50 relative">
-            <div class="mb-6 text-sm text-gray-600 bg-white border border-gray-200 p-4 rounded-xl flex gap-3 shadow-sm">
-                <i data-lucide="info" class="w-5 h-5 text-red-500 shrink-0"></i>
-                <p>Suporta YouTube, TikTok, Instagram (Reels), X/Twitter, Facebook, Kwai e centenas de outros sites. Basta colar o link abaixo!</p>
+        <div class="p-6 sm:p-10 pt-6">
+            
+            <!-- Plataformas Suportadas (Micro-UI) -->
+            <div class="flex items-center justify-center gap-4 mb-8 text-slate-500">
+                <i data-lucide="youtube" class="w-5 h-5 hover:text-white transition-colors" title="YouTube"></i>
+                <i data-lucide="instagram" class="w-5 h-5 hover:text-white transition-colors" title="Instagram"></i>
+                <i data-lucide="twitter" class="w-5 h-5 hover:text-white transition-colors" title="X/Twitter"></i>
+                <i data-lucide="facebook" class="w-5 h-5 hover:text-white transition-colors" title="Facebook"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">+ TikTok & Mais</span>
             </div>
 
             <!-- Formulário -->
-            <form id="downloadForm" class="space-y-4">
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <i data-lucide="link" class="w-5 h-5 text-gray-400"></i>
+            <form id="downloadForm" class="space-y-5">
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                        <i data-lucide="link-2" class="w-6 h-6 text-slate-400 group-focus-within:text-violet-400 transition-colors"></i>
                     </div>
-                    <input type="url" id="urlInputBaixador" class="block w-full pl-11 pr-4 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 bg-white text-gray-900 shadow-sm transition-shadow hover:shadow-md" placeholder="Cole o link do vídeo aqui..." required>
+                    <input type="url" id="urlInputBaixador" class="block w-full pl-14 pr-5 py-5 rounded-2xl glass-input text-lg font-medium placeholder-slate-500 shadow-inner" placeholder="Cole a ligação do vídeo aqui..." required autocomplete="off">
                 </div>
-                <button type="submit" class="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 px-4 rounded-xl transition-transform flex items-center justify-center gap-2 shadow-lg active:scale-95">
-                    <span>Analisar e Preparar</span>
-                    <i data-lucide="search" class="w-5 h-5"></i>
+                
+                <button type="submit" class="w-full bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white font-bold py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] active:scale-[0.98] text-lg border border-white/10">
+                    <span>Processar Vídeo</span>
+                    <i data-lucide="arrow-right" class="w-5 h-5"></i>
                 </button>
             </form>
 
-            <!-- Loading State da Busca -->
-            <div id="loadingStateBaixador" class="hidden flex flex-col items-center justify-center py-10">
-                <div class="loader mb-4"></div>
-                <p class="text-gray-500 text-sm font-medium animate-pulse">A procurar informações do vídeo...</p>
+            <!-- Loading State -->
+            <div id="loadingStateBaixador" class="hidden flex-col items-center justify-center py-12">
+                <div class="loader-ring mb-6"></div>
+                <p class="text-violet-300 text-sm font-semibold tracking-widest uppercase animate-pulse">A extrair dados neurais...</p>
             </div>
 
-            <div id="resultAreaBaixador" class="hidden mt-8 pt-6 border-t border-gray-200 fade-in">
-                <div class="flex flex-col gap-4 mb-6 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                    <div class="flex flex-col sm:flex-row gap-4 items-start">
-                        <img id="videoThumbBaixador" src="" class="w-full sm:w-40 h-28 object-cover rounded-xl shadow-md bg-gray-200 shrink-0">
-                        <div class="flex-1 min-w-0 w-full">
-                            <h2 id="videoTitleBaixador" class="text-base font-bold text-gray-900 line-clamp-2 mb-2" title="Título do Vídeo">Título</h2>
-                            
-                            <!-- Descrição -->
-                            <div class="bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs text-gray-600 max-h-24 overflow-y-auto custom-scrollbar">
-                                <span class="font-bold text-gray-800 block mb-1">Descrição:</span>
-                                <p id="videoDescBaixador" class="whitespace-pre-wrap leading-relaxed">Carregando...</p>
-                            </div>
+            <!-- Área de Resultados -->
+            <div id="resultAreaBaixador" class="hidden mt-8 fade-in-up">
+                
+                <div class="glass-panel p-5 rounded-[1.5rem] mb-6 flex flex-col sm:flex-row gap-5 items-start">
+                    <div class="relative w-full sm:w-48 shrink-0 overflow-hidden rounded-xl border border-white/10 group">
+                        <div class="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors z-10"></div>
+                        <img id="videoThumbBaixador" src="" class="w-full h-32 object-cover transition-transform duration-700 group-hover:scale-110">
+                        <div class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-md z-20 flex items-center gap-1">
+                            <i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i> Pronto
                         </div>
                     </div>
                     
-                    <div class="border-t border-gray-100 pt-4 mt-2" id="secaoQualidade">
-                        <label class="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
-                            <i data-lucide="settings" class="w-4 h-4 text-gray-500"></i> Escolha o Formato:
-                        </label>
-                        <select id="qualidadeBaixador" class="block w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 bg-gray-50 font-medium text-gray-900 cursor-pointer">
-                            <option value="alta">🎥 Vídeo: Alta Qualidade (Máxima disponível)</option>
-                            <option value="media">🎥 Vídeo: Qualidade Média (Mais leve)</option>
-                            <option value="audio">🎵 Apenas Áudio (Formato MP3)</option>
-                        </select>
+                    <div class="flex-1 min-w-0 w-full flex flex-col justify-between h-full">
+                        <div>
+                            <h2 id="videoTitleBaixador" class="text-base sm:text-lg font-bold text-white line-clamp-2 leading-snug mb-2" title="Título do Vídeo">Título do Vídeo</h2>
+                            <p class="text-xs text-slate-400 flex items-center gap-1 mb-3">
+                                <i data-lucide="shield-check" class="w-3 h-3 text-violet-400"></i> Analisado com segurança
+                            </p>
+                        </div>
+                        
+                        <!-- Seletor de Qualidade (Oculto para YouTube) -->
+                        <div id="secaoQualidade" class="mt-auto">
+                            <select id="qualidadeBaixador" class="block w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-violet-500 text-slate-200 font-medium cursor-pointer transition-colors hover:bg-slate-800">
+                                <option value="alta">🎥 MP4 - Alta Qualidade</option>
+                                <option value="media">🎥 MP4 - Qualidade Média</option>
+                                <option value="audio">🎵 MP3 - Apenas Áudio</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 
-                <button onclick="iniciarDownloadSelecionado()" id="btnFazerDownload" class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-4 rounded-xl shadow-xl transition-all active:scale-95 text-lg">
-                    <i data-lucide="download-cloud" class="w-6 h-6"></i> Iniciar Download
+                <button onclick="iniciarDownloadSelecionado()" id="btnFazerDownload" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-extrabold py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] active:scale-[0.98] text-lg">
+                    <i data-lucide="download" class="w-6 h-6"></i> <span>Descarregar Ficheiro</span>
                 </button>
             </div>
         </div>
     </main>
 
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
+
     <script>
+        // Inicializa Ícones
         lucide.createIcons();
         
         let urlParaBaixar = '';
         let tituloParaBaixar = '';
         let isYoutube = false;
+
+        // Função Premium para Notificações (Substitui o alert feio)
+        function mostrarNotificacao(mensagem, tipo = 'erro') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = tipo === 'erro' ? 'bg-rose-500/90' : 'bg-emerald-500/90';
+            let iconName = tipo === 'erro' ? 'alert-triangle' : 'check-circle';
+            
+            toast.className = `flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl text-white font-medium text-sm backdrop-blur-md border border-white/20 transform transition-all duration-500 translate-y-10 opacity-0 ${bgClass}`;
+            toast.innerHTML = `<i data-lucide="${iconName}" class="w-5 h-5 shrink-0"></i> <span>${mensagem}</span>`;
+            
+            container.appendChild(toast);
+            lucide.createIcons();
+            
+            // Animação de entrada
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-10', 'opacity-0');
+            });
+            
+            // Remove após 4 segundos
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
 
         function linkValido(url) {
             return url.trim().startsWith('http://') || url.trim().startsWith('https://');
@@ -121,15 +238,12 @@ HTML_SITE = """
             return match ? match[1] : null;
         }
 
-        // ==========================================
-        // LÓGICA DE PESQUISA INTELIGENTE
-        // ==========================================
         document.getElementById('downloadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const url = document.getElementById('urlInputBaixador').value.trim();
             
             if (!linkValido(url)) {
-                return alert("Por favor, insira um link válido começando com http:// ou https://");
+                return mostrarNotificacao("Por favor, insira uma ligação válida.", "erro");
             }
 
             urlParaBaixar = url;
@@ -138,25 +252,27 @@ HTML_SITE = """
 
             document.getElementById('resultAreaBaixador').classList.add('hidden');
             document.getElementById('loadingStateBaixador').classList.remove('hidden');
+            document.getElementById('loadingStateBaixador').classList.add('flex');
 
             if (isYoutube) {
-                // SE FOR YOUTUBE: Usa Noembed para evitar bloqueio do servidor
-                document.getElementById('secaoQualidade').classList.add('hidden'); // Esconde opção de qualidade pois o externo lida com isso
+                // FLUXO YOUTUBE (Vai para redirecionamento seguro para evitar bloqueio)
+                document.getElementById('secaoQualidade').classList.add('hidden');
                 try {
                     const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
                     const data = await response.json();
                     document.getElementById('videoTitleBaixador').textContent = data.title || "Vídeo do YouTube";
                     document.getElementById('videoThumbBaixador').src = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-                    document.getElementById('videoDescBaixador').textContent = "Pronto para baixar através do serviço externo seguro.";
                     
+                    document.getElementById('loadingStateBaixador').classList.remove('flex');
                     document.getElementById('loadingStateBaixador').classList.add('hidden');
                     document.getElementById('resultAreaBaixador').classList.remove('hidden');
                 } catch (error) {
-                    alert("Erro ao ler o vídeo. O link do YouTube está correto?");
+                    mostrarNotificacao("Erro ao ler o YouTube. O link está correto?");
+                    document.getElementById('loadingStateBaixador').classList.remove('flex');
                     document.getElementById('loadingStateBaixador').classList.add('hidden');
                 }
             } else {
-                // SE FOR TIKTOK, INSTA, FACEBOOK: Usa o nosso servidor Python
+                // FLUXO TIKTOK, INSTA, X (Processado no Backend)
                 document.getElementById('secaoQualidade').classList.remove('hidden');
                 try {
                     const response = await fetch('/api/info', {
@@ -169,45 +285,50 @@ HTML_SITE = """
                     if (res.sucesso) {
                         tituloParaBaixar = res.dados.titulo;
                         document.getElementById('videoTitleBaixador').textContent = res.dados.titulo;
-                        document.getElementById('videoThumbBaixador').src = res.dados.thumb || "https://via.placeholder.com/300x200.png?text=Sem+Capa";
-                        document.getElementById('videoDescBaixador').textContent = res.dados.descricao || "Nenhuma descrição disponível para este vídeo.";
+                        document.getElementById('videoThumbBaixador').src = res.dados.thumb || "https://via.placeholder.com/300x200/1e293b/8b5cf6.png?text=Vídeo+Encontrado";
                         
+                        document.getElementById('loadingStateBaixador').classList.remove('flex');
                         document.getElementById('loadingStateBaixador').classList.add('hidden');
                         document.getElementById('resultAreaBaixador').classList.remove('hidden');
+                        mostrarNotificacao("Vídeo identificado com sucesso!", "sucesso");
                     } else {
-                        alert("Erro ao ler o vídeo. Verifique se o link está correto e é público.");
+                        mostrarNotificacao("Erro ao ler o vídeo. Certifique-se que o link é público.");
+                        document.getElementById('loadingStateBaixador').classList.remove('flex');
                         document.getElementById('loadingStateBaixador').classList.add('hidden');
                     }
                 } catch (e) {
-                    alert("Erro de conexão com o servidor.");
+                    mostrarNotificacao("Falha de conexão com o servidor neural.");
+                    document.getElementById('loadingStateBaixador').classList.remove('flex');
                     document.getElementById('loadingStateBaixador').classList.add('hidden');
                 }
             }
         });
 
-        // ==========================================
-        // LÓGICA DE DOWNLOAD SEPARADA
-        // ==========================================
         async function iniciarDownloadSelecionado() {
             const btn = document.getElementById('btnFazerDownload');
+            const spanTexto = btn.querySelector('span');
             
             if (isYoutube) {
-                // Redireciona APENAS vídeos do Youtube para o site externo
+                // REDIRECIONA YOUTUBE PARA EVITAR BLOQUEIO DO RENDER
                 const videoId = extrairVideoId(urlParaBaixar);
                 const downloadUrl = `https://cobalt.tools/?v=https://www.youtube.com/watch?v=${videoId}`;
                 window.open(downloadUrl, '_blank');
                 
-                // Limpa o ecrã
+                // Reset Interface
                 document.getElementById('urlInputBaixador').value = '';
                 document.getElementById('resultAreaBaixador').classList.add('hidden');
+                mostrarNotificacao("A abrir túnel de download seguro...", "sucesso");
             } else {
-                // Para TikTok, Insta, etc... Faz o download NO NOSSO SERVIDOR
+                // PROCESSA OUTRAS REDES DIRETAMENTE NO SERVIDOR
                 const qualidade = document.getElementById('qualidadeBaixador').value;
                 
                 btn.disabled = true;
-                btn.innerHTML = '<div class="loader !border-t-white !w-6 !h-6 mr-2"></div> A processar no servidor...';
-                btn.classList.replace('bg-red-600', 'bg-gray-800');
-                btn.classList.replace('hover:bg-red-700', 'hover:bg-gray-900');
+                spanTexto.textContent = "A processar no servidor...";
+                btn.classList.replace('bg-emerald-500', 'bg-slate-700');
+                btn.classList.replace('hover:bg-emerald-400', 'hover:bg-slate-600');
+                btn.classList.remove('text-slate-900');
+                btn.classList.add('text-white');
+                btn.innerHTML = '<div class="loader-ring !w-5 !h-5 !border-2 !border-t-white mr-2"></div> <span>' + spanTexto.textContent + '</span>';
 
                 try {
                     const response = await fetch('/api/download_video', {
@@ -218,27 +339,31 @@ HTML_SITE = """
                     const result = await response.json();
                     
                     if (result.sucesso) {
-                        btn.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i> Pronto! A enviar ficheiro...';
-                        btn.classList.replace('bg-gray-800', 'bg-green-600');
-                        btn.classList.replace('hover:bg-gray-900', 'hover:bg-green-700');
+                        btn.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i> <span>A enviar ficheiro...</span>';
+                        btn.classList.replace('bg-slate-700', 'bg-violet-600');
+                        btn.classList.replace('hover:bg-slate-600', 'hover:bg-violet-500');
                         
-                        // Envia para o PC do utilizador
+                        // Executa Download
                         window.location.href = `/api/download_file?id=${result.id}&titulo=${encodeURIComponent(tituloParaBaixar)}&ext=${result.ext}`;
+                        mostrarNotificacao("Download iniciado com sucesso!", "sucesso");
                         
                         setTimeout(() => {
                             btn.disabled = false;
-                            btn.innerHTML = '<i data-lucide="download-cloud" class="w-6 h-6"></i> Iniciar Download';
-                            btn.classList.replace('bg-green-600', 'bg-red-600');
-                            btn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
+                            btn.classList.replace('bg-violet-600', 'bg-emerald-500');
+                            btn.classList.replace('hover:bg-violet-500', 'hover:bg-emerald-400');
+                            btn.classList.remove('text-white');
+                            btn.classList.add('text-slate-900');
+                            btn.innerHTML = '<i data-lucide="download" class="w-6 h-6"></i> <span>Descarregar Ficheiro</span>';
+                            
                             document.getElementById('urlInputBaixador').value = '';
                             document.getElementById('resultAreaBaixador').classList.add('hidden');
                         }, 5000);
                     } else {
-                        alert("Erro ao baixar: " + result.erro);
+                        mostrarNotificacao(result.erro, "erro");
                         restaurarBotaoErro(btn);
                     }
                 } catch (e) { 
-                    alert("Erro de conexão durante o download."); 
+                    mostrarNotificacao("Perda de conexão durante o processamento.", "erro"); 
                     restaurarBotaoErro(btn);
                 }
                 lucide.createIcons();
@@ -247,9 +372,11 @@ HTML_SITE = """
 
         function restaurarBotaoErro(btn) {
             btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="refresh-cw" class="w-6 h-6"></i> Tentar Novamente';
-            btn.classList.replace('bg-gray-800', 'bg-red-600');
-            btn.classList.replace('hover:bg-gray-900', 'hover:bg-red-700');
+            btn.classList.replace('bg-slate-700', 'bg-emerald-500');
+            btn.classList.replace('hover:bg-slate-600', 'hover:bg-emerald-400');
+            btn.classList.remove('text-white');
+            btn.classList.add('text-slate-900');
+            btn.innerHTML = '<i data-lucide="refresh-cw" class="w-6 h-6"></i> <span>Tentar Novamente</span>';
         }
     </script>
 </body>
@@ -276,7 +403,6 @@ def limpar_arquivos_antigos():
 def home():
     return render_template_string(HTML_SITE)
 
-# Rota usada pelas redes sociais (exceto youtube)
 @app.route('/api/info', methods=['POST'])
 def info_video():
     url = request.json.get('url')
@@ -288,13 +414,12 @@ def info_video():
                 'titulo': info.get('title', 'Vídeo Sem Título'),
                 'canal': info.get('uploader', 'Autor Desconhecido'),
                 'thumb': info.get('thumbnail', ''),
-                'descricao': info.get('description', 'Nenhuma descrição disponível.') 
+                'descricao': info.get('description', '') 
             }
         return jsonify({'sucesso': True, 'dados': dados})
     except Exception as e:
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
-# Rota de download usada pelas redes sociais (exceto youtube)
 @app.route('/api/download_video', methods=['POST'])
 def download_video():
     limpar_arquivos_antigos()
@@ -351,7 +476,7 @@ def enviar_para_usuario():
     
     titulo_limpo = "".join([c for c in titulo if c.isalnum() or c in ' _-']).rstrip()
     if not titulo_limpo:
-        titulo_limpo = "video_macim"
+        titulo_limpo = "Macim_Download"
         
     caminho_arquivo = f'downloads/{file_id}.{ext}'
     return send_file(caminho_arquivo, as_attachment=True, download_name=f"{titulo_limpo}.{ext}")
