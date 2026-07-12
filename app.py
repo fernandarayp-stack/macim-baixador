@@ -174,7 +174,7 @@ HTML_SITE = """
                             </p>
                         </div>
                         
-                        <!-- Seletor de Qualidade (Oculto para YouTube e Insta) -->
+                        <!-- Seletor de Qualidade -->
                         <div id="secaoQualidade" class="mt-auto">
                             <select id="qualidadeBaixador" class="block w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-violet-500 text-slate-200 font-medium cursor-pointer transition-colors hover:bg-slate-800">
                                 <option value="alta">🎥 MP4 - Alta Qualidade</option>
@@ -200,7 +200,6 @@ HTML_SITE = """
         let urlParaBaixar = '';
         let tituloParaBaixar = '';
         let isYoutube = false;
-        let isInstagram = false;
 
         function mostrarNotificacao(mensagem, tipo = 'erro') {
             const container = document.getElementById('toast-container');
@@ -246,45 +245,31 @@ HTML_SITE = """
             urlParaBaixar = url;
             const videoId = extrairVideoId(url);
             isYoutube = videoId !== null;
-            isInstagram = url.includes('instagram.com') || url.includes('instagr.am');
 
             document.getElementById('resultAreaBaixador').classList.add('hidden');
             document.getElementById('loadingStateBaixador').classList.remove('hidden');
             document.getElementById('loadingStateBaixador').classList.add('flex');
 
-            if (isYoutube || isInstagram) {
-                // FLUXO DE REDIRECIONAMENTO (Para evitar bloqueios de API no Render)
+            if (isYoutube) {
+                // FLUXO DE REDIRECIONAMENTO (Apenas para o YouTube)
                 document.getElementById('secaoQualidade').classList.add('hidden');
                 
-                if (isYoutube) {
-                    try {
-                        const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
-                        const data = await response.json();
-                        document.getElementById('videoTitleBaixador').textContent = data.title || "Vídeo do YouTube";
-                        document.getElementById('videoThumbBaixador').src = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-                        
-                        document.getElementById('loadingStateBaixador').classList.remove('flex');
-                        document.getElementById('loadingStateBaixador').classList.add('hidden');
-                        document.getElementById('resultAreaBaixador').classList.remove('hidden');
-                    } catch (error) {
-                        mostrarNotificacao("Erro ao ler o YouTube. O link está correto?");
-                        document.getElementById('loadingStateBaixador').classList.remove('flex');
-                        document.getElementById('loadingStateBaixador').classList.add('hidden');
-                    }
-                } else if (isInstagram) {
-                    // Interface premium genérica para o Instagram
-                    setTimeout(() => {
-                        document.getElementById('videoTitleBaixador').textContent = "Reels ou Post do Instagram";
-                        // Capa abstrata moderna para Instagram
-                        document.getElementById('videoThumbBaixador').src = "https://images.unsplash.com/photo-1611262588024-d12430b98920?q=80&w=400&auto=format&fit=crop";
-                        
-                        document.getElementById('loadingStateBaixador').classList.remove('flex');
-                        document.getElementById('loadingStateBaixador').classList.add('hidden');
-                        document.getElementById('resultAreaBaixador').classList.remove('hidden');
-                    }, 600);
+                try {
+                    const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+                    const data = await response.json();
+                    document.getElementById('videoTitleBaixador').textContent = data.title || "Vídeo do YouTube";
+                    document.getElementById('videoThumbBaixador').src = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+                    
+                    document.getElementById('loadingStateBaixador').classList.remove('flex');
+                    document.getElementById('loadingStateBaixador').classList.add('hidden');
+                    document.getElementById('resultAreaBaixador').classList.remove('hidden');
+                } catch (error) {
+                    mostrarNotificacao("Erro ao ler o YouTube. O link está correto?");
+                    document.getElementById('loadingStateBaixador').classList.remove('flex');
+                    document.getElementById('loadingStateBaixador').classList.add('hidden');
                 }
             } else {
-                // FLUXO NORMAL (TikTok, X, Kwai processados no Backend)
+                // FLUXO NORMAL (Instagram, TikTok, X processados DIRETAMENTE no Backend da tela)
                 document.getElementById('secaoQualidade').classList.remove('hidden');
                 try {
                     const response = await fetch('/api/info', {
@@ -320,14 +305,10 @@ HTML_SITE = """
             const btn = document.getElementById('btnFazerDownload');
             const spanTexto = btn.querySelector('span');
             
-            if (isYoutube || isInstagram) {
-                // REDIRECIONA YOUTUBE E INSTAGRAM PARA EVITAR BLOQUEIOS
-                let urlFinal = urlParaBaixar;
-                if (isYoutube) {
-                    const videoId = extrairVideoId(urlParaBaixar);
-                    urlFinal = `https://www.youtube.com/watch?v=${videoId}`;
-                }
-                
+            if (isYoutube) {
+                // REDIRECIONA APENAS O YOUTUBE
+                const videoId = extrairVideoId(urlParaBaixar);
+                const urlFinal = `https://www.youtube.com/watch?v=${videoId}`;
                 const downloadUrl = `https://cobalt.tools/?v=${encodeURIComponent(urlFinal)}`;
                 window.open(downloadUrl, '_blank');
                 
@@ -336,7 +317,7 @@ HTML_SITE = """
                 document.getElementById('resultAreaBaixador').classList.add('hidden');
                 mostrarNotificacao("A abrir túnel de download seguro...", "sucesso");
             } else {
-                // PROCESSA OUTRAS REDES DIRETAMENTE NO SERVIDOR
+                // PROCESSA INSTAGRAM, TIKTOK E OUTRAS REDES DIRETAMENTE AQUI NA TELA
                 const qualidade = document.getElementById('qualidadeBaixador').value;
                 
                 btn.disabled = true;
@@ -360,7 +341,7 @@ HTML_SITE = """
                         btn.classList.replace('bg-slate-700', 'bg-violet-600');
                         btn.classList.replace('hover:bg-slate-600', 'hover:bg-violet-500');
                         
-                        // Executa Download
+                        // Executa Download para o PC/Telemóvel do utilizador
                         window.location.href = `/api/download_file?id=${result.id}&titulo=${encodeURIComponent(tituloParaBaixar)}&ext=${result.ext}`;
                         mostrarNotificacao("Download iniciado com sucesso!", "sucesso");
                         
@@ -376,7 +357,7 @@ HTML_SITE = """
                             document.getElementById('resultAreaBaixador').classList.add('hidden');
                         }, 5000);
                     } else {
-                        mostrarNotificacao(result.erro, "erro");
+                        mostrarNotificacao("Erro: " + result.erro, "erro");
                         restaurarBotaoErro(btn);
                     }
                 } catch (e) { 
