@@ -4,6 +4,9 @@ import yt_dlp
 import os
 import uuid
 import time
+import urllib.request
+import urllib.error
+import re
 
 app = Flask(__name__)
 
@@ -207,7 +210,6 @@ HTML_SITE = """
             return url.trim().startsWith('http://') || url.trim().startsWith('https://');
         }
 
-        // Submissão do Formulário de Busca
         document.getElementById('downloadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const url = document.getElementById('urlInputBaixador').value.trim();
@@ -216,7 +218,7 @@ HTML_SITE = """
                 return mostrarNotificacao("Por favor, insira uma ligação válida.", "erro");
             }
 
-            // BLOQUEIO EXPLÍCITO DO INSTAGRAM COMO PEDIDO
+            // BLOQUEIO EXPLÍCITO DO INSTAGRAM
             if (url.toLowerCase().includes('instagram.com')) {
                 return mostrarNotificacao("Os downloads do Instagram foram desativados temporariamente.", "erro");
             }
@@ -228,7 +230,6 @@ HTML_SITE = """
             document.getElementById('loadingStateBaixador').classList.add('flex');
 
             try {
-                // Chama a nossa rota segura Python (local yt-dlp)
                 const response = await fetch('/api/info', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -255,7 +256,6 @@ HTML_SITE = """
             }
         });
 
-        // Clique no botão "Baixar Agora"
         async function iniciarDownloadSelecionado() {
             const btn = document.getElementById('btnFazerDownload');
             const spanTexto = btn.querySelector('span');
@@ -270,7 +270,6 @@ HTML_SITE = """
             btn.innerHTML = '<div class="loader-ring !w-5 !h-5 !border-2 !border-t-white mr-2"></div> <span>' + spanTexto.textContent + '</span>';
 
             try {
-                // Chama a rota de download local que roda o yt-dlp
                 const response = await fetch('/api/download_video', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -283,8 +282,13 @@ HTML_SITE = """
                     btn.classList.replace('bg-slate-700', 'bg-violet-600');
                     btn.classList.replace('hover:bg-slate-600', 'hover:bg-violet-500');
                     
-                    // Dispara o download nativo do arquivo no navegador do utilizador!
-                    window.location.href = `/api/download_file?id=${result.id}&titulo=${encodeURIComponent(document.getElementById('videoTitleBaixador').textContent)}&ext=${result.ext}`;
+                    // MAGIA NINJA: Apenas faz o download se for direto da API (YouTube) ou do próprio Render (TikTok etc),
+                    // mantendo a pessoa SEMPRE no Macim Download!
+                    if (result.direto) {
+                        window.location.href = result.url; // Baixa direto invisivelmente
+                    } else {
+                        window.location.href = `/api/download_file?id=${result.id}&titulo=${encodeURIComponent(document.getElementById('videoTitleBaixador').textContent)}&ext=${result.ext}`;
+                    }
                     
                     mostrarNotificacao("Download iniciado com sucesso!", "sucesso");
                     
@@ -324,21 +328,52 @@ HTML_SITE = """
 """
 
 def limpar_arquivos_antigos():
-    """Limpeza automática de ficheiros antigos para o servidor não lotar a memória"""
     pasta_destino = 'downloads'
     if not os.path.exists(pasta_destino):
         return
-        
     agora = time.time()
     for f in os.listdir(pasta_destino):
         caminho = os.path.join(pasta_destino, f)
         if os.path.isfile(caminho):
-            # Se o arquivo tem mais de 3600 segundos (1 hora), apaga-o
             if agora - os.path.getmtime(caminho) > 3600:
-                try:
-                    os.remove(caminho)
-                except Exception:
-                    pass
+                try: os.remove(caminho)
+                except Exception: pass
+
+def obter_link_direto_youtube(url, qualidade):
+    """
+    Motor Invisível: Faz o pedido à API por trás dos panos, sem atirar o utilizador para fora do site.
+    """
+    instances = [
+        "https://api.cobalt.tools/",
+        "https://co.wuk.sh/",
+        "https://cobalt.q0.wtf/"
+    ]
+    payload_dict = {
+        "url": url,
+        "videoQuality": "720" if qualidade == 'media' else "1080",
+        "isAudioOnly": True if qualidade == 'audio' else False
+    }
+    data_bytes = json.dumps(payload_dict).encode('utf-8')
+
+    for api_url in instances:
+        try:
+            req = urllib.request.Request(api_url, data=data_bytes, method='POST')
+            req.add_header('Accept', 'application/json')
+            req.add_header('Content-Type', 'application/json')
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
+            
+            origin = api_url.replace("api.", "").rstrip("/")
+            req.add_header('Origin', origin)
+            req.add_header('Referer', origin + "/")
+
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    res_data = json.loads(response.read().decode('utf-8'))
+                    if "url" in res_data:
+                        return res_data["url"]
+        except Exception:
+            continue
+    return None
 
 @app.route('/')
 def home():
@@ -346,17 +381,30 @@ def home():
 
 @app.route('/api/info', methods=['POST'])
 def info_video():
-    """
-    Busca informações do vídeo usando o yt-dlp local.
-    """
-    url = request.json.get('url')
+    url = request.json.get('url', '')
     
-    # Bloqueio do Instagram no backend para segurança extra
     if 'instagram.com' in url.lower():
         return jsonify({'sucesso': False, 'erro': 'Os downloads do Instagram foram desativados temporariamente.'})
         
+    # SE FOR YOUTUBE: Driblamos o bloqueio para encontrar a capa do vídeo
+    if 'youtube.com' in url.lower() or 'youtu.be' in url.lower():
+        match = re.search(r'(?:v=|/)([0-9A-Za-z_-]{11}).*', url)
+        video_id = match.group(1) if match else None
+        if video_id:
+            try:
+                req = urllib.request.Request(f"https://noembed.com/embed?url=https://www.youtube.com/watch?v={video_id}")
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    res_data = json.loads(response.read().decode('utf-8'))
+                    dados = {
+                        'titulo': res_data.get('title', 'Vídeo do YouTube'),
+                        'thumb': f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+                    }
+                    return jsonify({'sucesso': True, 'dados': dados})
+            except Exception:
+                pass
+                
+    # SE FOR TIKTOK/FACEBOOK: yt-dlp normal
     opcoes_ydl = {'quiet': True, 'extract_flat': False, 'noplaylist': True}
-    
     try:
         with yt_dlp.YoutubeDL(opcoes_ydl) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -366,22 +414,29 @@ def info_video():
             }
         return jsonify({'sucesso': True, 'dados': dados})
     except Exception as e:
-        return jsonify({'sucesso': False, 'erro': 'Erro ao ler o vídeo. Verifique se o link está correto e se o vídeo é público.'})
+        return jsonify({'sucesso': False, 'erro': 'Erro ao ler o vídeo. Verifique se o link está correto.'})
 
 @app.route('/api/download_video', methods=['POST'])
 def download_video():
-    """
-    Faz o download do vídeo no servidor usando yt-dlp.
-    """
-    limpar_arquivos_antigos() # Faz a limpeza antes de baixar um novo
+    limpar_arquivos_antigos()
     
     dados = request.json
-    url = dados.get('url')
+    url = dados.get('url', '')
     qualidade = dados.get('qualidade', 'alta')
     
     if 'instagram.com' in url.lower():
         return jsonify({'sucesso': False, 'erro': 'Os downloads do Instagram foram desativados.'})
-    
+
+    # SE FOR YOUTUBE: Puxar do sistema Ninja sem redirecionar
+    if 'youtube.com' in url.lower() or 'youtu.be' in url.lower():
+        link_magico = obter_link_direto_youtube(url, qualidade)
+        if link_magico:
+            # Retorna com a tag 'direto=True' para a ecrã fazer baixar invisivelmente
+            return jsonify({"sucesso": True, "direto": True, "url": link_magico})
+        else:
+            return jsonify({"sucesso": False, "erro": "Segurança do YouTube impediu a extração."})
+
+    # SE FOR TIKTOK, FACEBOOK: Descarrega localmente (Padrão e Funcional)
     pasta_destino = 'downloads'
     os.makedirs(pasta_destino, exist_ok=True)
     file_id = str(uuid.uuid4())
@@ -390,11 +445,7 @@ def download_video():
         opcoes_ydl = {
             'format': 'bestaudio/best',
             'outtmpl': f'{pasta_destino}/{file_id}.%(ext)s',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
+            'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
             'quiet': True, 'noplaylist': True
         }
         ext_final = 'mp3'
@@ -420,23 +471,18 @@ def download_video():
             ydl.download([url])
         return jsonify({"sucesso": True, "id": file_id, "ext": ext_final})
     except Exception as e:
-        return jsonify({"sucesso": False, "erro": "Falha ao processar o vídeo. Pode estar restrito ou bloqueado na plataforma."})
+        return jsonify({"sucesso": False, "erro": "Falha ao processar o vídeo."})
 
 @app.route('/api/download_file')
 def enviar_para_usuario():
-    """
-    Envia o ficheiro baixado do servidor Render para o PC do utilizador.
-    """
     file_id = request.args.get('id')
     titulo = request.args.get('titulo', 'macim_download')
     ext = request.args.get('ext', 'mp4')
     
     titulo_limpo = "".join([c for c in titulo if c.isalnum() or c in ' _-']).rstrip()
-    if not titulo_limpo:
-        titulo_limpo = "macim_download"
+    if not titulo_limpo: titulo_limpo = "macim_download"
         
     caminho_arquivo = f'downloads/{file_id}.{ext}'
-    
     return send_file(caminho_arquivo, as_attachment=True, download_name=f"{titulo_limpo}.{ext}")
 
 if __name__ == '__main__':
