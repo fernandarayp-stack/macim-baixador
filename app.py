@@ -1,10 +1,8 @@
 import urllib.request
 import json
-from flask import Flask, request, jsonify, render_template_string, send_file
+from flask import Flask, request, jsonify, render_template_string
 import yt_dlp
 import os
-import uuid
-import time
 
 app = Flask(__name__)
 
@@ -24,8 +22,8 @@ HTML_SITE = """
     
     <style>
         :root {
-            --primary: #8b5cf6; /* Violet */
-            --secondary: #3b82f6; /* Blue */
+            --primary: #8b5cf6;
+            --secondary: #3b82f6;
         }
         body {
             font-family: 'Outfit', sans-serif;
@@ -35,7 +33,6 @@ HTML_SITE = """
             min-height: 100vh;
         }
         
-        /* Glassmorphism Classes */
         .glass-panel {
             background: rgba(30, 41, 59, 0.6);
             backdrop-filter: blur(16px);
@@ -56,7 +53,6 @@ HTML_SITE = """
             outline: none;
         }
 
-        /* Animated Blobs in Background */
         .blob {
             position: absolute;
             border-radius: 50%;
@@ -72,7 +68,6 @@ HTML_SITE = """
             100% { transform: translate(30px, 50px) scale(1.1); }
         }
 
-        /* Loading Spinner Advanced */
         .loader-ring {
             width: 40px; height: 40px;
             border: 3px solid rgba(139, 92, 246, 0.2);
@@ -82,14 +77,12 @@ HTML_SITE = """
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* General Animations */
         .fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
         
-        /* Gradient Text */
         .text-gradient {
             background: linear-gradient(to right, #a78bfa, #60a5fa);
             -webkit-background-clip: text;
@@ -99,14 +92,11 @@ HTML_SITE = """
 </head>
 <body class="relative flex items-center justify-center p-4">
 
-    <!-- Background Animated Blobs -->
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
 
-    <!-- Main Container -->
     <main class="w-full max-w-2xl glass-panel rounded-[2rem] overflow-hidden fade-in-up flex flex-col relative z-10">
         
-        <!-- Premium Header -->
         <div class="p-8 pb-6 text-center relative border-b border-white/5">
             <div class="inline-flex items-center justify-center p-4 bg-white/5 rounded-2xl mb-4 border border-white/10 shadow-lg backdrop-blur-md relative group">
                 <div class="absolute inset-0 bg-gradient-to-r from-violet-500 to-blue-500 opacity-20 group-hover:opacity-40 transition-opacity rounded-2xl blur-md"></div>
@@ -120,7 +110,6 @@ HTML_SITE = """
 
         <div class="p-6 sm:p-10 pt-6">
             
-            <!-- Plataformas Suportadas -->
             <div class="flex items-center justify-center gap-4 mb-8 text-slate-500">
                 <i data-lucide="youtube" class="w-5 h-5 hover:text-white transition-colors" title="YouTube"></i>
                 <i data-lucide="instagram" class="w-5 h-5 hover:text-white transition-colors" title="Instagram"></i>
@@ -129,13 +118,12 @@ HTML_SITE = """
                 <span class="text-xs font-bold uppercase tracking-widest">+ TikTok & Mais</span>
             </div>
 
-            <!-- Formulário -->
             <form id="downloadForm" class="space-y-5">
                 <div class="relative group">
                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                         <i data-lucide="link-2" class="w-6 h-6 text-slate-400 group-focus-within:text-violet-400 transition-colors"></i>
                     </div>
-                    <input type="url" id="urlInputBaixador" class="block w-full pl-14 pr-5 py-5 rounded-2xl glass-input text-lg font-medium placeholder-slate-500 shadow-inner" placeholder="Cole a ligação do vídeo aqui..." required autocomplete="off">
+                    <input type="url" id="urlInputBaixador" class="block w-full pl-14 pr-5 py-5 rounded-2xl glass-input text-lg font-medium placeholder-slate-500 shadow-inner" placeholder="Cole a ligação do vídeo aqui (Insta, YT, TikTok...)" required autocomplete="off">
                 </div>
                 
                 <button type="submit" class="w-full bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white font-bold py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] active:scale-[0.98] text-lg border border-white/10">
@@ -144,13 +132,11 @@ HTML_SITE = """
                 </button>
             </form>
 
-            <!-- Loading State -->
             <div id="loadingStateBaixador" class="hidden flex-col items-center justify-center py-12">
                 <div class="loader-ring mb-6"></div>
-                <p class="text-violet-300 text-sm font-semibold tracking-widest uppercase animate-pulse">A procurar vídeo...</p>
+                <p class="text-violet-300 text-sm font-semibold tracking-widest uppercase animate-pulse">A procurar informações...</p>
             </div>
 
-            <!-- Área de Resultados -->
             <div id="resultAreaBaixador" class="hidden mt-8 fade-in-up">
                 
                 <div class="glass-panel p-5 rounded-[1.5rem] mb-6 flex flex-col sm:flex-row gap-5 items-start">
@@ -166,7 +152,7 @@ HTML_SITE = """
                         <div>
                             <h2 id="videoTitleBaixador" class="text-base sm:text-lg font-bold text-white line-clamp-2 leading-snug mb-2" title="Título do Vídeo">Título do Vídeo</h2>
                             <p class="text-xs text-slate-400 flex items-center gap-1 mb-3">
-                                <i data-lucide="shield-check" class="w-3 h-3 text-violet-400"></i> Analisado com segurança
+                                <i data-lucide="shield-check" class="w-3 h-3 text-violet-400"></i> API Segura Ativada
                             </p>
                         </div>
                         
@@ -181,20 +167,18 @@ HTML_SITE = """
                 </div>
                 
                 <button onclick="iniciarDownloadSelecionado()" id="btnFazerDownload" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-extrabold py-5 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] active:scale-[0.98] text-lg">
-                    <i data-lucide="download" class="w-6 h-6"></i> <span>Descarregar Ficheiro</span>
+                    <i data-lucide="download" class="w-6 h-6"></i> <span>Baixar Agora</span>
                 </button>
             </div>
         </div>
     </main>
 
-    <!-- Notificações Flutuantes -->
     <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
 
     <script>
         lucide.createIcons();
         
         let urlParaBaixar = '';
-        let tituloParaBaixar = '';
 
         function mostrarNotificacao(mensagem, tipo = 'erro') {
             const container = document.getElementById('toast-container');
@@ -223,7 +207,7 @@ HTML_SITE = """
             return url.trim().startsWith('http://') || url.trim().startsWith('https://');
         }
 
-        // Submissão do link para procurar as informações
+        // Submissão do Formulário de Busca
         document.getElementById('downloadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const url = document.getElementById('urlInputBaixador').value.trim();
@@ -239,7 +223,7 @@ HTML_SITE = """
             document.getElementById('loadingStateBaixador').classList.add('flex');
 
             try {
-                // Manda a ligação para o Python
+                // Chama a nossa rota segura Python
                 const response = await fetch('/api/info', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -248,14 +232,13 @@ HTML_SITE = """
                 const res = await response.json();
                 
                 if (res.sucesso) {
-                    tituloParaBaixar = res.dados.titulo;
                     document.getElementById('videoTitleBaixador').textContent = res.dados.titulo;
                     document.getElementById('videoThumbBaixador').src = res.dados.thumb;
                     
                     document.getElementById('loadingStateBaixador').classList.remove('flex');
                     document.getElementById('loadingStateBaixador').classList.add('hidden');
                     document.getElementById('resultAreaBaixador').classList.remove('hidden');
-                    mostrarNotificacao("Vídeo identificado!", "sucesso");
+                    mostrarNotificacao("Pronto para baixar!", "sucesso");
                 } else {
                     mostrarNotificacao("Erro: " + res.erro);
                     document.getElementById('loadingStateBaixador').classList.remove('flex');
@@ -268,15 +251,14 @@ HTML_SITE = """
             }
         });
 
-        // Clique no botão "Descarregar Ficheiro"
+        // Clique no botão "Baixar Agora"
         async function iniciarDownloadSelecionado() {
             const btn = document.getElementById('btnFazerDownload');
             const spanTexto = btn.querySelector('span');
             const qualidade = document.getElementById('qualidadeBaixador').value;
             
-            // Muda o visual do botão para "Processando"
             btn.disabled = true;
-            spanTexto.textContent = "A extrair vídeo (Pode demorar)...";
+            spanTexto.textContent = "A conectar aos motores de Alta Velocidade...";
             btn.classList.replace('bg-emerald-500', 'bg-slate-700');
             btn.classList.replace('hover:bg-emerald-400', 'hover:bg-slate-600');
             btn.classList.remove('text-slate-900');
@@ -284,29 +266,23 @@ HTML_SITE = """
             btn.innerHTML = '<div class="loader-ring !w-5 !h-5 !border-2 !border-t-white mr-2"></div> <span>' + spanTexto.textContent + '</span>';
 
             try {
-                // A magia acontece aqui: o backend tenta baixar. Se for Instagram/Youtube e bloquear, ele usa a API invisível.
-                const response = await fetch('/api/download_video', {
+                // Aqui a mágica acontece. Nosso Python chama a API do Cobalt invisivelmente.
+                const response = await fetch('/api/obter_link', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url: urlParaBaixar, qualidade: qualidade })
                 });
                 const result = await response.json();
                 
-                if (result.sucesso) {
-                    btn.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i> <span>Download Autorizado!</span>';
+                if (result.sucesso && result.link_direto) {
+                    btn.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i> <span>A iniciar o seu Download!</span>';
                     btn.classList.replace('bg-slate-700', 'bg-violet-600');
                     btn.classList.replace('hover:bg-slate-600', 'hover:bg-violet-500');
                     
-                    // Se o Python devolver um link direto da API secreta (plano B), baixa por lá
-                    if (result.link_direto) {
-                        window.location.href = result.link_direto;
-                    } 
-                    // Se o Python conseguiu baixar normalmente no servidor (plano A)
-                    else {
-                        window.location.href = `/api/download_file?id=${result.id}&titulo=${encodeURIComponent(tituloParaBaixar)}&ext=${result.ext}`;
-                    }
+                    // Dispara o download nativo do arquivo no navegador do utilizador! Sem sair do site!
+                    window.location.href = result.link_direto;
                     
-                    mostrarNotificacao("Download iniciado na mesma ecrã!", "sucesso");
+                    mostrarNotificacao("Download iniciado com sucesso!", "sucesso");
                     
                     setTimeout(() => {
                         btn.disabled = false;
@@ -320,11 +296,11 @@ HTML_SITE = """
                         document.getElementById('resultAreaBaixador').classList.add('hidden');
                     }, 5000);
                 } else {
-                    mostrarNotificacao("Erro: " + result.erro, "erro");
+                    mostrarNotificacao("Falha na extração. Tente noutro momento.", "erro");
                     restaurarBotaoErro(btn);
                 }
             } catch (e) { 
-                mostrarNotificacao("Perda de conexão durante o processamento.", "erro"); 
+                mostrarNotificacao("Perda de conexão.", "erro"); 
                 restaurarBotaoErro(btn);
             }
             lucide.createIcons();
@@ -343,143 +319,104 @@ HTML_SITE = """
 </html>
 """
 
-def limpar_arquivos_antigos():
-    """Limpeza automática de ficheiros antigos para o servidor não lotar a memória"""
-    pasta_destino = 'downloads'
-    if not os.path.exists(pasta_destino):
-        return
-    agora = time.time()
-    for f in os.listdir(pasta_destino):
-        caminho = os.path.join(pasta_destino, f)
-        if os.path.isfile(caminho):
-            if agora - os.path.getmtime(caminho) > 3600:
-                try: os.remove(caminho)
-                except Exception: pass
-
-def buscar_link_invisivel(url, qualidade):
-    """
-    O MOTOR NINJA:
-    Se o YouTube ou o Instagram bloquearem o servidor, esta função acede a uma 
-    API pública e gratuita (co.wuk.sh / cobalt) para puxar o link direto do MP4.
-    O utilizador não sai do site, o vídeo baixa sozinho.
-    """
-    try:
-        is_audio = (qualidade == 'audio')
-        api_url = "https://co.wuk.sh/api/json"
-        req = urllib.request.Request(api_url, method="POST")
-        req.add_header("Accept", "application/json")
-        req.add_header("Content-Type", "application/json")
-        
-        payload = {
-            "url": url,
-            "isAudioOnly": is_audio
-        }
-        data = json.dumps(payload).encode("utf-8")
-        
-        with urllib.request.urlopen(req, data=data, timeout=15) as response:
-            res_data = json.loads(response.read().decode())
-            if res_data.get("url"):
-                return res_data["url"]
-    except Exception:
-        pass
-    return None
-
 @app.route('/')
 def home():
     return render_template_string(HTML_SITE)
 
 @app.route('/api/info', methods=['POST'])
 def info_video():
+    """
+    Tenta pegar a capa e o título do vídeo. 
+    Se o YouTube/Instagram bloquear a leitura do servidor, o site não quebra.
+    Ele exibe um card "Genérico" dizendo que o vídeo foi detetado e permite avançar.
+    """
     url = request.json.get('url')
     opcoes_ydl = {'quiet': True, 'extract_flat': False, 'noplaylist': True}
+    
     try:
         with yt_dlp.YoutubeDL(opcoes_ydl) as ydl:
             info = ydl.extract_info(url, download=False)
             dados = {
-                'titulo': info.get('title', 'Vídeo Sem Título'),
-                'canal': info.get('uploader', 'Autor Desconhecido'),
-                'thumb': info.get('thumbnail', ''),
-                'descricao': info.get('description', '') 
+                'titulo': info.get('title', 'Vídeo Encontrado'),
+                'thumb': info.get('thumbnail', 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=600&auto=format&fit=crop')
             }
         return jsonify({'sucesso': True, 'dados': dados})
-    except Exception as e:
-        # SEGREDO PARA O INSTAGRAM:
-        # Se o yt-dlp não conseguir ler o vídeo (porque o Insta pede login ao servidor), 
-        # nós não damos erro na tela! Criamos um "vídeo genérico" para o botão aparecer.
+    except Exception:
+        # Modo de Segurança: Em vez de dar erro, geramos um card visual bonito
+        # e deixamos o motor da API (Cobalt) cuidar do download real na próxima etapa.
         dados = {
-            'titulo': 'Vídeo Encontrado (Informações Ocultas)',
-            'canal': 'Pronto para download',
-            'thumb': 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=600&auto=format&fit=crop',
-            'descricao': 'Vídeo identificado.'
+            'titulo': 'Vídeo Detetado (Proteção Ativa)',
+            'thumb': 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=600&auto=format&fit=crop'
         }
         return jsonify({'sucesso': True, 'dados': dados})
 
-@app.route('/api/download_video', methods=['POST'])
-def download_video():
-    limpar_arquivos_antigos()
-    
+@app.route('/api/obter_link', methods=['POST'])
+def obter_link():
+    """
+    A MÁGICA: O nosso servidor Python fala secretamente com a API do Cobalt.
+    O Render nunca baixa o arquivo, ele apenas pede o "Link Direto Limpo" à API
+    e manda para o navegador do utilizador. Zero bloqueios, zero memória gasta!
+    """
     dados = request.json
-    url = dados.get('url')
+    video_url = dados.get('url')
     qualidade = dados.get('qualidade', 'alta')
     
-    pasta_destino = 'downloads'
-    os.makedirs(pasta_destino, exist_ok=True)
-    file_id = str(uuid.uuid4())
+    # Configurações para a API secreta do Cobalt
+    api_endpoint = "https://api.cobalt.tools/api/json"
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     
-    if qualidade == 'audio':
-        opcoes_ydl = {
-            'format': 'bestaudio/best',
-            'outtmpl': f'{pasta_destino}/{file_id}.%(ext)s',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'quiet': True, 'noplaylist': True
-        }
-        ext_final = 'mp3'
-    elif qualidade == 'media':
-        opcoes_ydl = {
-            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
-            'merge_output_format': 'mp4',
-            'outtmpl': f'{pasta_destino}/{file_id}.%(ext)s',
-            'quiet': True, 'noplaylist': True
-        }
-        ext_final = 'mp4'
-    else: 
-        opcoes_ydl = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            'merge_output_format': 'mp4',
-            'outtmpl': f'{pasta_destino}/{file_id}.%(ext)s',
-            'quiet': True, 'noplaylist': True
-        }
-        ext_final = 'mp4'
-
+    is_audio = True if qualidade == "audio" else False
+    v_quality = "720" if qualidade == "media" else "1080"
+    
+    payload = {
+        "url": video_url,
+        "isAudioOnly": is_audio,
+        "vQuality": v_quality
+    }
+    
+    req = urllib.request.Request(
+        api_endpoint, 
+        data=json.dumps(payload).encode('utf-8'), 
+        headers=headers, 
+        method='POST'
+    )
+    
     try:
-        # TENTA BAIXAR O ARQUIVO NO RENDER
-        with yt_dlp.YoutubeDL(opcoes_ydl) as ydl:
-            ydl.download([url])
-        return jsonify({"sucesso": True, "id": file_id, "ext": ext_final})
+        # Faz o pedido invisível à API do Cobalt
+        with urllib.request.urlopen(req, timeout=20) as response:
+            res_data = json.loads(response.read().decode())
+            
+            # A API devolve o link puro final (status = stream, redirect ou success)
+            link_direto = res_data.get('url')
+            
+            if link_direto:
+                return jsonify({"sucesso": True, "link_direto": link_direto})
+            else:
+                return jsonify({"sucesso": False, "erro": "A API não devolveu um link válido."})
+                
     except Exception as e:
-        # SERVIDOR BLOQUEADO (YOUTUBE OU INSTAGRAM)! ACIONA O PLANO NINJA INVISÍVEL
-        link_direto = buscar_link_invisivel(url, qualidade)
-        if link_direto:
-            return jsonify({"sucesso": True, "link_direto": link_direto})
-        else:
-            return jsonify({"sucesso": False, "erro": "Bloqueio de segurança da plataforma. Tente novamente."}), 500
-
-@app.route('/api/download_file')
-def enviar_para_usuario():
-    file_id = request.args.get('id')
-    titulo = request.args.get('titulo', 'video_baixado')
-    ext = request.args.get('ext', 'mp4')
-    
-    titulo_limpo = "".join([c for c in titulo if c.isalnum() or c in ' _-']).rstrip()
-    if not titulo_limpo:
-        titulo_limpo = "Macim_Download"
-        
-    caminho_arquivo = f'downloads/{file_id}.{ext}'
-    return send_file(caminho_arquivo, as_attachment=True, download_name=f"{titulo_limpo}.{ext}")
+        # Se a API principal falhar, tentamos uma instância comunitária pública
+        try:
+            fallback_endpoint = "https://co.wuk.sh/api/json"
+            req_fallback = urllib.request.Request(
+                fallback_endpoint, 
+                data=json.dumps(payload).encode('utf-8'), 
+                headers=headers, 
+                method='POST'
+            )
+            with urllib.request.urlopen(req_fallback, timeout=20) as response:
+                res_data = json.loads(response.read().decode())
+                link_direto = res_data.get('url')
+                if link_direto:
+                    return jsonify({"sucesso": True, "link_direto": link_direto})
+        except:
+            pass
+            
+        return jsonify({"sucesso": False, "erro": "Serviço temporariamente indisponível."}), 500
 
 if __name__ == '__main__':
     porta = int(os.environ.get("PORT", 5000))
