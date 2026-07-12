@@ -174,7 +174,7 @@ HTML_SITE = """
                             </p>
                         </div>
                         
-                        <!-- Seletor de Qualidade (Oculto para YouTube) -->
+                        <!-- Seletor de Qualidade (Oculto para YouTube e Insta) -->
                         <div id="secaoQualidade" class="mt-auto">
                             <select id="qualidadeBaixador" class="block w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-violet-500 text-slate-200 font-medium cursor-pointer transition-colors hover:bg-slate-800">
                                 <option value="alta">🎥 MP4 - Alta Qualidade</option>
@@ -195,14 +195,13 @@ HTML_SITE = """
     <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
 
     <script>
-        // Inicializa Ícones
         lucide.createIcons();
         
         let urlParaBaixar = '';
         let tituloParaBaixar = '';
         let isYoutube = false;
+        let isInstagram = false;
 
-        // Função Premium para Notificações (Substitui o alert feio)
         function mostrarNotificacao(mensagem, tipo = 'erro') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -216,12 +215,10 @@ HTML_SITE = """
             container.appendChild(toast);
             lucide.createIcons();
             
-            // Animação de entrada
             requestAnimationFrame(() => {
                 toast.classList.remove('translate-y-10', 'opacity-0');
             });
             
-            // Remove após 4 segundos
             setTimeout(() => {
                 toast.classList.add('translate-y-10', 'opacity-0');
                 setTimeout(() => toast.remove(), 500);
@@ -249,30 +246,45 @@ HTML_SITE = """
             urlParaBaixar = url;
             const videoId = extrairVideoId(url);
             isYoutube = videoId !== null;
+            isInstagram = url.includes('instagram.com') || url.includes('instagr.am');
 
             document.getElementById('resultAreaBaixador').classList.add('hidden');
             document.getElementById('loadingStateBaixador').classList.remove('hidden');
             document.getElementById('loadingStateBaixador').classList.add('flex');
 
-            if (isYoutube) {
-                // FLUXO YOUTUBE (Vai para redirecionamento seguro para evitar bloqueio)
+            if (isYoutube || isInstagram) {
+                // FLUXO DE REDIRECIONAMENTO (Para evitar bloqueios de API no Render)
                 document.getElementById('secaoQualidade').classList.add('hidden');
-                try {
-                    const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
-                    const data = await response.json();
-                    document.getElementById('videoTitleBaixador').textContent = data.title || "Vídeo do YouTube";
-                    document.getElementById('videoThumbBaixador').src = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-                    
-                    document.getElementById('loadingStateBaixador').classList.remove('flex');
-                    document.getElementById('loadingStateBaixador').classList.add('hidden');
-                    document.getElementById('resultAreaBaixador').classList.remove('hidden');
-                } catch (error) {
-                    mostrarNotificacao("Erro ao ler o YouTube. O link está correto?");
-                    document.getElementById('loadingStateBaixador').classList.remove('flex');
-                    document.getElementById('loadingStateBaixador').classList.add('hidden');
+                
+                if (isYoutube) {
+                    try {
+                        const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+                        const data = await response.json();
+                        document.getElementById('videoTitleBaixador').textContent = data.title || "Vídeo do YouTube";
+                        document.getElementById('videoThumbBaixador').src = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+                        
+                        document.getElementById('loadingStateBaixador').classList.remove('flex');
+                        document.getElementById('loadingStateBaixador').classList.add('hidden');
+                        document.getElementById('resultAreaBaixador').classList.remove('hidden');
+                    } catch (error) {
+                        mostrarNotificacao("Erro ao ler o YouTube. O link está correto?");
+                        document.getElementById('loadingStateBaixador').classList.remove('flex');
+                        document.getElementById('loadingStateBaixador').classList.add('hidden');
+                    }
+                } else if (isInstagram) {
+                    // Interface premium genérica para o Instagram
+                    setTimeout(() => {
+                        document.getElementById('videoTitleBaixador').textContent = "Reels ou Post do Instagram";
+                        // Capa abstrata moderna para Instagram
+                        document.getElementById('videoThumbBaixador').src = "https://images.unsplash.com/photo-1611262588024-d12430b98920?q=80&w=400&auto=format&fit=crop";
+                        
+                        document.getElementById('loadingStateBaixador').classList.remove('flex');
+                        document.getElementById('loadingStateBaixador').classList.add('hidden');
+                        document.getElementById('resultAreaBaixador').classList.remove('hidden');
+                    }, 600);
                 }
             } else {
-                // FLUXO TIKTOK, INSTA, X (Processado no Backend)
+                // FLUXO NORMAL (TikTok, X, Kwai processados no Backend)
                 document.getElementById('secaoQualidade').classList.remove('hidden');
                 try {
                     const response = await fetch('/api/info', {
@@ -308,10 +320,15 @@ HTML_SITE = """
             const btn = document.getElementById('btnFazerDownload');
             const spanTexto = btn.querySelector('span');
             
-            if (isYoutube) {
-                // REDIRECIONA YOUTUBE PARA EVITAR BLOQUEIO DO RENDER
-                const videoId = extrairVideoId(urlParaBaixar);
-                const downloadUrl = `https://cobalt.tools/?v=https://www.youtube.com/watch?v=${videoId}`;
+            if (isYoutube || isInstagram) {
+                // REDIRECIONA YOUTUBE E INSTAGRAM PARA EVITAR BLOQUEIOS
+                let urlFinal = urlParaBaixar;
+                if (isYoutube) {
+                    const videoId = extrairVideoId(urlParaBaixar);
+                    urlFinal = `https://www.youtube.com/watch?v=${videoId}`;
+                }
+                
+                const downloadUrl = `https://cobalt.tools/?v=${encodeURIComponent(urlFinal)}`;
                 window.open(downloadUrl, '_blank');
                 
                 // Reset Interface
