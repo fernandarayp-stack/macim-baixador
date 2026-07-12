@@ -1,3 +1,5 @@
+import urllib.request
+import json
 from flask import Flask, request, jsonify, render_template_string, send_file
 import yt_dlp
 import os
@@ -87,12 +89,6 @@ HTML_SITE = """
             to { opacity: 1; transform: translateY(0); }
         }
         
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
-
         /* Gradient Text */
         .text-gradient {
             background: linear-gradient(to right, #a78bfa, #60a5fa);
@@ -124,7 +120,7 @@ HTML_SITE = """
 
         <div class="p-6 sm:p-10 pt-6">
             
-            <!-- Plataformas Suportadas (Micro-UI) -->
+            <!-- Plataformas Suportadas -->
             <div class="flex items-center justify-center gap-4 mb-8 text-slate-500">
                 <i data-lucide="youtube" class="w-5 h-5 hover:text-white transition-colors" title="YouTube"></i>
                 <i data-lucide="instagram" class="w-5 h-5 hover:text-white transition-colors" title="Instagram"></i>
@@ -151,7 +147,7 @@ HTML_SITE = """
             <!-- Loading State -->
             <div id="loadingStateBaixador" class="hidden flex-col items-center justify-center py-12">
                 <div class="loader-ring mb-6"></div>
-                <p class="text-violet-300 text-sm font-semibold tracking-widest uppercase animate-pulse">A extrair dados neurais...</p>
+                <p class="text-violet-300 text-sm font-semibold tracking-widest uppercase animate-pulse">A procurar vídeo...</p>
             </div>
 
             <!-- Área de Resultados -->
@@ -174,7 +170,6 @@ HTML_SITE = """
                             </p>
                         </div>
                         
-                        <!-- Seletor de Qualidade -->
                         <div id="secaoQualidade" class="mt-auto">
                             <select id="qualidadeBaixador" class="block w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-violet-500 text-slate-200 font-medium cursor-pointer transition-colors hover:bg-slate-800">
                                 <option value="alta">🎥 MP4 - Alta Qualidade</option>
@@ -192,6 +187,7 @@ HTML_SITE = """
         </div>
     </main>
 
+    <!-- Notificações Flutuantes -->
     <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none"></div>
 
     <script>
@@ -199,7 +195,6 @@ HTML_SITE = """
         
         let urlParaBaixar = '';
         let tituloParaBaixar = '';
-        let isYoutube = false;
 
         function mostrarNotificacao(mensagem, tipo = 'erro') {
             const container = document.getElementById('toast-container');
@@ -228,12 +223,7 @@ HTML_SITE = """
             return url.trim().startsWith('http://') || url.trim().startsWith('https://');
         }
 
-        function extrairVideoId(url) {
-            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts|live)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
-            const match = url.match(regex);
-            return match ? match[1] : null;
-        }
-
+        // Submissão do link para procurar as informações
         document.getElementById('downloadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const url = document.getElementById('urlInputBaixador').value.trim();
@@ -243,129 +233,101 @@ HTML_SITE = """
             }
 
             urlParaBaixar = url;
-            const videoId = extrairVideoId(url);
-            isYoutube = videoId !== null;
 
             document.getElementById('resultAreaBaixador').classList.add('hidden');
             document.getElementById('loadingStateBaixador').classList.remove('hidden');
             document.getElementById('loadingStateBaixador').classList.add('flex');
 
-            if (isYoutube) {
-                // FLUXO DE REDIRECIONAMENTO (Apenas para o YouTube)
-                document.getElementById('secaoQualidade').classList.add('hidden');
+            try {
+                // Manda a ligação para o Python
+                const response = await fetch('/api/info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+                const res = await response.json();
                 
-                try {
-                    const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
-                    const data = await response.json();
-                    document.getElementById('videoTitleBaixador').textContent = data.title || "Vídeo do YouTube";
-                    document.getElementById('videoThumbBaixador').src = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+                if (res.sucesso) {
+                    tituloParaBaixar = res.dados.titulo;
+                    document.getElementById('videoTitleBaixador').textContent = res.dados.titulo;
+                    document.getElementById('videoThumbBaixador').src = res.dados.thumb;
                     
                     document.getElementById('loadingStateBaixador').classList.remove('flex');
                     document.getElementById('loadingStateBaixador').classList.add('hidden');
                     document.getElementById('resultAreaBaixador').classList.remove('hidden');
-                } catch (error) {
-                    mostrarNotificacao("Erro ao ler o YouTube. O link está correto?");
+                    mostrarNotificacao("Vídeo identificado!", "sucesso");
+                } else {
+                    mostrarNotificacao("Erro: " + res.erro);
                     document.getElementById('loadingStateBaixador').classList.remove('flex');
                     document.getElementById('loadingStateBaixador').classList.add('hidden');
                 }
-            } else {
-                // FLUXO NORMAL (Instagram, TikTok, X processados DIRETAMENTE no Backend da tela)
-                document.getElementById('secaoQualidade').classList.remove('hidden');
-                try {
-                    const response = await fetch('/api/info', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: url })
-                    });
-                    const res = await response.json();
-                    
-                    if (res.sucesso) {
-                        tituloParaBaixar = res.dados.titulo;
-                        document.getElementById('videoTitleBaixador').textContent = res.dados.titulo;
-                        document.getElementById('videoThumbBaixador').src = res.dados.thumb || "https://via.placeholder.com/300x200/1e293b/8b5cf6.png?text=Vídeo+Encontrado";
-                        
-                        document.getElementById('loadingStateBaixador').classList.remove('flex');
-                        document.getElementById('loadingStateBaixador').classList.add('hidden');
-                        document.getElementById('resultAreaBaixador').classList.remove('hidden');
-                        mostrarNotificacao("Vídeo identificado com sucesso!", "sucesso");
-                    } else {
-                        mostrarNotificacao("Erro ao ler o vídeo. Certifique-se que o link é público.");
-                        document.getElementById('loadingStateBaixador').classList.remove('flex');
-                        document.getElementById('loadingStateBaixador').classList.add('hidden');
-                    }
-                } catch (e) {
-                    mostrarNotificacao("Falha de conexão com o servidor neural.");
-                    document.getElementById('loadingStateBaixador').classList.remove('flex');
-                    document.getElementById('loadingStateBaixador').classList.add('hidden');
-                }
+            } catch (e) {
+                mostrarNotificacao("Falha de conexão com o servidor.");
+                document.getElementById('loadingStateBaixador').classList.remove('flex');
+                document.getElementById('loadingStateBaixador').classList.add('hidden');
             }
         });
 
+        // Clique no botão "Descarregar Ficheiro"
         async function iniciarDownloadSelecionado() {
             const btn = document.getElementById('btnFazerDownload');
             const spanTexto = btn.querySelector('span');
+            const qualidade = document.getElementById('qualidadeBaixador').value;
             
-            if (isYoutube) {
-                // REDIRECIONA APENAS O YOUTUBE
-                const videoId = extrairVideoId(urlParaBaixar);
-                const urlFinal = `https://www.youtube.com/watch?v=${videoId}`;
-                const downloadUrl = `https://cobalt.tools/?v=${encodeURIComponent(urlFinal)}`;
-                window.open(downloadUrl, '_blank');
-                
-                // Reset Interface
-                document.getElementById('urlInputBaixador').value = '';
-                document.getElementById('resultAreaBaixador').classList.add('hidden');
-                mostrarNotificacao("A abrir túnel de download seguro...", "sucesso");
-            } else {
-                // PROCESSA INSTAGRAM, TIKTOK E OUTRAS REDES DIRETAMENTE AQUI NA TELA
-                const qualidade = document.getElementById('qualidadeBaixador').value;
-                
-                btn.disabled = true;
-                spanTexto.textContent = "A processar no servidor...";
-                btn.classList.replace('bg-emerald-500', 'bg-slate-700');
-                btn.classList.replace('hover:bg-emerald-400', 'hover:bg-slate-600');
-                btn.classList.remove('text-slate-900');
-                btn.classList.add('text-white');
-                btn.innerHTML = '<div class="loader-ring !w-5 !h-5 !border-2 !border-t-white mr-2"></div> <span>' + spanTexto.textContent + '</span>';
+            // Muda o visual do botão para "Processando"
+            btn.disabled = true;
+            spanTexto.textContent = "A extrair vídeo (Pode demorar)...";
+            btn.classList.replace('bg-emerald-500', 'bg-slate-700');
+            btn.classList.replace('hover:bg-emerald-400', 'hover:bg-slate-600');
+            btn.classList.remove('text-slate-900');
+            btn.classList.add('text-white');
+            btn.innerHTML = '<div class="loader-ring !w-5 !h-5 !border-2 !border-t-white mr-2"></div> <span>' + spanTexto.textContent + '</span>';
 
-                try {
-                    const response = await fetch('/api/download_video', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: urlParaBaixar, qualidade: qualidade })
-                    });
-                    const result = await response.json();
+            try {
+                // A magia acontece aqui: o backend tenta baixar. Se for Instagram/Youtube e bloquear, ele usa a API invisível.
+                const response = await fetch('/api/download_video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlParaBaixar, qualidade: qualidade })
+                });
+                const result = await response.json();
+                
+                if (result.sucesso) {
+                    btn.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i> <span>Download Autorizado!</span>';
+                    btn.classList.replace('bg-slate-700', 'bg-violet-600');
+                    btn.classList.replace('hover:bg-slate-600', 'hover:bg-violet-500');
                     
-                    if (result.sucesso) {
-                        btn.innerHTML = '<i data-lucide="check-circle" class="w-6 h-6"></i> <span>A enviar ficheiro...</span>';
-                        btn.classList.replace('bg-slate-700', 'bg-violet-600');
-                        btn.classList.replace('hover:bg-slate-600', 'hover:bg-violet-500');
-                        
-                        // Executa Download para o PC/Telemóvel do utilizador
+                    // Se o Python devolver um link direto da API secreta (plano B), baixa por lá
+                    if (result.link_direto) {
+                        window.location.href = result.link_direto;
+                    } 
+                    // Se o Python conseguiu baixar normalmente no servidor (plano A)
+                    else {
                         window.location.href = `/api/download_file?id=${result.id}&titulo=${encodeURIComponent(tituloParaBaixar)}&ext=${result.ext}`;
-                        mostrarNotificacao("Download iniciado com sucesso!", "sucesso");
-                        
-                        setTimeout(() => {
-                            btn.disabled = false;
-                            btn.classList.replace('bg-violet-600', 'bg-emerald-500');
-                            btn.classList.replace('hover:bg-violet-500', 'hover:bg-emerald-400');
-                            btn.classList.remove('text-white');
-                            btn.classList.add('text-slate-900');
-                            btn.innerHTML = '<i data-lucide="download" class="w-6 h-6"></i> <span>Descarregar Ficheiro</span>';
-                            
-                            document.getElementById('urlInputBaixador').value = '';
-                            document.getElementById('resultAreaBaixador').classList.add('hidden');
-                        }, 5000);
-                    } else {
-                        mostrarNotificacao("Erro: " + result.erro, "erro");
-                        restaurarBotaoErro(btn);
                     }
-                } catch (e) { 
-                    mostrarNotificacao("Perda de conexão durante o processamento.", "erro"); 
+                    
+                    mostrarNotificacao("Download iniciado na mesma ecrã!", "sucesso");
+                    
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.classList.replace('bg-violet-600', 'bg-emerald-500');
+                        btn.classList.replace('hover:bg-violet-500', 'hover:bg-emerald-400');
+                        btn.classList.remove('text-white');
+                        btn.classList.add('text-slate-900');
+                        btn.innerHTML = '<i data-lucide="download" class="w-6 h-6"></i> <span>Descarregar Novo Ficheiro</span>';
+                        
+                        document.getElementById('urlInputBaixador').value = '';
+                        document.getElementById('resultAreaBaixador').classList.add('hidden');
+                    }, 5000);
+                } else {
+                    mostrarNotificacao("Erro: " + result.erro, "erro");
                     restaurarBotaoErro(btn);
                 }
-                lucide.createIcons();
+            } catch (e) { 
+                mostrarNotificacao("Perda de conexão durante o processamento.", "erro"); 
+                restaurarBotaoErro(btn);
             }
+            lucide.createIcons();
         }
 
         function restaurarBotaoErro(btn) {
@@ -386,16 +348,41 @@ def limpar_arquivos_antigos():
     pasta_destino = 'downloads'
     if not os.path.exists(pasta_destino):
         return
-        
     agora = time.time()
     for f in os.listdir(pasta_destino):
         caminho = os.path.join(pasta_destino, f)
         if os.path.isfile(caminho):
             if agora - os.path.getmtime(caminho) > 3600:
-                try:
-                    os.remove(caminho)
-                except Exception:
-                    pass
+                try: os.remove(caminho)
+                except Exception: pass
+
+def buscar_link_invisivel(url, qualidade):
+    """
+    O MOTOR NINJA:
+    Se o YouTube ou o Instagram bloquearem o servidor, esta função acede a uma 
+    API pública e gratuita (co.wuk.sh / cobalt) para puxar o link direto do MP4.
+    O utilizador não sai do site, o vídeo baixa sozinho.
+    """
+    try:
+        is_audio = (qualidade == 'audio')
+        api_url = "https://co.wuk.sh/api/json"
+        req = urllib.request.Request(api_url, method="POST")
+        req.add_header("Accept", "application/json")
+        req.add_header("Content-Type", "application/json")
+        
+        payload = {
+            "url": url,
+            "isAudioOnly": is_audio
+        }
+        data = json.dumps(payload).encode("utf-8")
+        
+        with urllib.request.urlopen(req, data=data, timeout=15) as response:
+            res_data = json.loads(response.read().decode())
+            if res_data.get("url"):
+                return res_data["url"]
+    except Exception:
+        pass
+    return None
 
 @app.route('/')
 def home():
@@ -416,7 +403,16 @@ def info_video():
             }
         return jsonify({'sucesso': True, 'dados': dados})
     except Exception as e:
-        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+        # SEGREDO PARA O INSTAGRAM:
+        # Se o yt-dlp não conseguir ler o vídeo (porque o Insta pede login ao servidor), 
+        # nós não damos erro na tela! Criamos um "vídeo genérico" para o botão aparecer.
+        dados = {
+            'titulo': 'Vídeo Encontrado (Informações Ocultas)',
+            'canal': 'Pronto para download',
+            'thumb': 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=600&auto=format&fit=crop',
+            'descricao': 'Vídeo identificado.'
+        }
+        return jsonify({'sucesso': True, 'dados': dados})
 
 @app.route('/api/download_video', methods=['POST'])
 def download_video():
@@ -460,11 +456,17 @@ def download_video():
         ext_final = 'mp4'
 
     try:
+        # TENTA BAIXAR O ARQUIVO NO RENDER
         with yt_dlp.YoutubeDL(opcoes_ydl) as ydl:
             ydl.download([url])
         return jsonify({"sucesso": True, "id": file_id, "ext": ext_final})
     except Exception as e:
-        return jsonify({"sucesso": False, "erro": str(e)}), 500
+        # SERVIDOR BLOQUEADO (YOUTUBE OU INSTAGRAM)! ACIONA O PLANO NINJA INVISÍVEL
+        link_direto = buscar_link_invisivel(url, qualidade)
+        if link_direto:
+            return jsonify({"sucesso": True, "link_direto": link_direto})
+        else:
+            return jsonify({"sucesso": False, "erro": "Bloqueio de segurança da plataforma. Tente novamente."}), 500
 
 @app.route('/api/download_file')
 def enviar_para_usuario():
